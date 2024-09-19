@@ -40,6 +40,7 @@ class InfiniteDataLoader:
                 batch_sampler=_InfiniteSampler(batch_sampler),
             )
         )
+        # print(self._infinite_iterator)
 
     def __iter__(self):
         while True:

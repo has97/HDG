@@ -55,12 +55,14 @@ def get_k_u_classes_set(args, eval_name_dict, train_loaders, eval_loaders):
         ]
         unique_all_target_labels = np.unique(eval_loaders[idx[0]].dataset.labels)
     elif args.loader_name == 'daml_loader':
+        for loader in train_loaders:
+            print(loader.dataset.filter_class)
         unique_src_labels_list = [
             loader.dataset.filter_class for loader in train_loaders
         ]
         # half = len(train_loaders) // 2
         # unique_src_labels_list = [train_loaders[2 * i].dataset.filter_class for i in range(half)]
-        unique_all_target_labels = eval_loaders[idx[0]].dataset.filter_class
+        unique_all_target_labels = eval_loaders[0].dataset.filter_class
 
     known_classes_set = set(np.concatenate(unique_src_labels_list, axis=None))
 
@@ -163,18 +165,18 @@ def load_checkpoint(filename, alg, args):
 
 
 def train_valid_target_eval_names(args):
-    eval_name_dict = {"train": [], "valid": [], "target": [], "source_unknown": []}
+    eval_name_dict = {"train": [0,1,2], "valid": [0,1,2], "target": [3], "source_unknown": []}
     t = 0
-    for i in range(args.domain_num):
-        if i not in args.test_envs:
-            eval_name_dict["train"].append(t)
-            t += 1
-    for i in range(args.domain_num):
-        if i not in args.test_envs:
-            eval_name_dict["valid"].append(t)
-        else:
-            eval_name_dict["target"].append(t)
-        t += 1
+    # for i in range(args.domain_num):
+    #     if i not in args.test_envs:
+    #         eval_name_dict["train"].append(t)
+    #         t += 1
+    # for i in range(args.domain_num):
+    #     if i not in args.test_envs:
+    #         eval_name_dict["valid"].append(t)
+    #     else:
+    #         eval_name_dict["target"].append(t)
+    #     t += 1
     return eval_name_dict
 
 

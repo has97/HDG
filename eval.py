@@ -28,6 +28,7 @@ from datautil.getdataloader import (
     get_img_daml_dataloader,
     get_img_source_unknown_dataloader,
     get_img_daml_source_unknown_dataloader,
+    get_odgclip_dataloader,
     get_img_daml_multi_dataloader,
     # get_img_daml_multi_source_unknown_dataloader,
 )
@@ -54,12 +55,13 @@ def get_args():
     parser.add_argument(
         "--classifier", type=str, default="linear", choices=["linear", "wn"]
     )
-    parser.add_argument("--data_file", type=str, default="", help="root_dir")
-    parser.add_argument("--dataset", type=str, default="office")
-    parser.add_argument("--data_dir", type=str, default="", help="data dir")
+
+    parser.add_argument("--dataset", type=str, default="office-home")
+    parser.add_argument("--data_dir", type=str, default="/raid/biplab/hassan/office_home_dg", help="root dir")
     parser.add_argument(
         "--dis_hidden", type=int, default=256, help="dis hidden dimension"
     )
+    parser.add_argument("--shot", type=float, default=1, help="shots")
     parser.add_argument(
         "--disttype",
         type=str,
@@ -184,7 +186,7 @@ def get_args():
     parser.add_argument("--hyper3", type=float, default=0.1)
     args = parser.parse_args()
 
-    args.data_dir = args.data_file + args.data_dir
+    # args.data_dir = args.data_file + args.data_dir
     os.environ["CUDA_VISIBLE_DEVICS"] = args.gpu_id
     # breakpoint()
     if args.dataset != 'MultiDataSet':
@@ -210,20 +212,20 @@ if __name__ == "__main__":
     set_random_seed(args.seed)
 
     loss_list = alg_loss_dict(args)
-
-    if args.loader_name == 'DeepDG_loader':
-        train_loaders, eval_loaders = get_img_dataloader(args)
+    train_loaders,eval_loaders = get_odgclip_dataloader(args)
+    # if args.loader_name == 'DeepDG_loader':
+    #     train_loaders, eval_loaders = get_img_dataloader(args)
         source_unknown_loaders = get_img_source_unknown_dataloader(args)
 
-    elif args.loader_name == 'daml_loader':
-        if args.d_path == 'nothing':
-            train_loaders, eval_loaders = get_img_daml_dataloader(args)
-            source_unknown_loaders = get_img_daml_source_unknown_dataloader(args)
-        elif args.dataset == 'MultiDataSet':
-            train_loaders, eval_loaders = get_img_daml_multi_dataloader(args)
-            source_unknown_loaders = (
-                eval_loaders  # get_img_daml_multi_source_unknown_dataloader(args)
-            )
+    # elif args.loader_name == 'daml_loader':
+    #     if args.d_path == 'nothing':
+    #         train_loaders, eval_loaders = get_img_daml_dataloader(args)
+    #         source_unknown_loaders = get_img_daml_source_unknown_dataloader(args)
+    #     elif args.dataset == 'MultiDataSet':
+    #         train_loaders, eval_loaders = get_img_daml_multi_dataloader(args)
+    #         source_unknown_loaders = (
+    #             eval_loaders  # get_img_daml_multi_source_unknown_dataloader(args)
+    #         )
 
     # eval_name_dict = {"train": [], "valid": [], "target": []}
     if args.dataset == 'MultiDataSet':
@@ -279,7 +281,7 @@ if __name__ == "__main__":
                 [
                     modelopera.accuracy(
                         algorithm,
-                        eval_loaders[i],
+                        eval_loaders[0],
                         item,
                         known_classes_set,
                         unknown_classes_set,
@@ -347,7 +349,7 @@ if __name__ == "__main__":
 
     target_auroc = modelopera.auroc(
         algorithm,
-        eval_loaders[eval_name_dict['target'][0]],
+        eval_loaders[0],
         'target',
         known_classes_set,
         unknown_classes_set,

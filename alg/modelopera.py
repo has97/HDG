@@ -50,6 +50,10 @@ def accuracy(
             y = data[1].to(device).long()  # torch.Size([64])
             p = network.predict(x)  # p means logits. torch.Size([64, known_classes])
             # p = network.base(x)  # p means logits. torch.Size([64, known_classes])
+            # print("--------------------")
+            # print(y)
+            # print(p.argmax(1))
+            # print("--------------------")
 
             if p.size(1) == 1:  # binary classification
                 correct += (p.gt(0).eq(y).float()).sum().item()
@@ -259,6 +263,7 @@ def auroc(
 ):
 
     # DAML
+    # print(known_classes_set)
     for weight in network.parameters():
         weight.fast = None
     device = f'cuda:{gpu_id}'
@@ -275,6 +280,8 @@ def auroc(
             y_binaries.extend(y_binary)
             p = network.predict(x)  # p means logits. torch.Size([64, 65])
             max_logit: torch.tensor = p.max(dim=1).values
+            # print(max_logits)
+            # print(y)
             max_logits.extend(max_logit.tolist())
 
     auroc = roc_auc_score(y_binaries, max_logits)
@@ -387,7 +394,7 @@ def h_score(
 
     network.train()
 
-    return h_score
+    return h_score,k_acc,u_acc
 
 
 def get_thresholds(network, loader, gpu_id):

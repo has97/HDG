@@ -5,8 +5,109 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import STL10
 import datautil.imgdata.util as imgutil
 from datautil.imgdata.imgdataload import ImageDataset
+from datautil.imgdata.odg import CustomDataset
+from datautil.imgdata.pacs import CustomDatasetPACS
 from datautil.mydataloader import InfiniteDataLoader
 import dalib.vision.datasets as datasets
+
+def get_odgclip_dataloader(args):
+    rate =0.2
+    trdatalist,valdatalist,tedatalist = [], [], []
+    if args.dataset =='office-home':
+        names = ['art','clipart','product','realworld']
+        args.domain_num = len(names)
+
+        source_classes: list(list) = [[], [], []]
+        needed_classes: list(list) = [[], [], [], []]
+
+        if args.dataset == 'office-home':
+            # source_classes[0] = list(range(0, 18))
+            # source_classes[1] = list(range(18,36))
+            # source_classes[2] = list(range(36,54))
+            # all_target_classes = list(range(0,65))
+            source_classes[0] = list(range(0, 15)) + list(range(21, 32))
+            source_classes[1] = list(range(0, 9)) + list(range(15, 21)) + list(range(32, 43))
+            source_classes[2] = list(range(0, 3)) + list(range(9, 21)) + list(range(43, 54))
+            all_target_classes = [0,3,4,9,10,15,16,21,22,23,32,33,34,43,44,45] + list(range(54, 65))
+    elif args.dataset =='PACS':
+        names = ['cartoon','photo','sketch', 'art_painting']
+        args.domain_num = len(names)
+
+        source_classes: list(list) = [[], [], []]
+        needed_classes: list(list) = [[], [], [], []]
+
+        source_classes[0] = [3, 0, 1]
+        source_classes[1] = [4, 0, 2]
+        source_classes[2] = [5, 1, 2]
+        all_target_classes = [0,1,2,3,4,5,6]
+        
+
+    needed_classes[3] = all_target_classes
+    indices = list(range(4))
+    indices.remove(args.test_envs[0])
+    source_domains = []
+    for i in range(len(names)):
+        if i == args.test_envs[0]:
+            continue
+        source_domains.append(names[i])
+    for k in range(3):
+        needed_classes[k] = source_classes[k]
+    source_domains.sort()
+    i=0
+    for s in source_domains:
+        if args.dataset == 'PACS':
+            trdatalist.append(
+                CustomDatasetPACS(args.data_dir,source_classes[i],source_domains[i],needed_classes,args.shot,i,indices=None,transform=imgutil.image_train(args.dataset, args.is_data_aug)
+                )
+            )
+            valdatalist.append(
+                CustomDatasetPACS(args.data_dir,source_classes[i],source_domains[i],needed_classes,-1,i,indices=None,transform=imgutil.image_test(args.dataset),train=False
+                )
+            )
+
+        elif args.dataset == 'office-home':
+            trdatalist.append(
+                CustomDataset(args.data_dir,source_classes[i],source_domains[i],needed_classes,args.shot,i,indices=None,transform=imgutil.image_train(args.dataset, args.is_data_aug)
+                )
+            )
+            valdatalist.append(
+                CustomDataset(args.data_dir,source_classes[i],source_domains[i],needed_classes,-1,i,indices=None,transform=imgutil.image_test(args.dataset),train=False
+                )
+            )
+        i+=1
+    if args.dataset =='office-home':
+        tedatalist.append(
+                CustomDataset(args.data_dir,all_target_classes,names[args.test_envs[0]],needed_classes,-1,3,indices=None,transform=imgutil.image_test(args.dataset),train=False
+                )
+            )
+    elif args.dataset == 'PACS':
+        tedatalist.append(
+                CustomDatasetPACS(args.data_dir,all_target_classes,names[args.test_envs[0]],needed_classes,-1,3,indices=None,transform=imgutil.image_test(args.dataset),train=False
+                )
+            )
+    train_loaders = [
+        InfiniteDataLoader(
+            dataset=env,
+            weights=None,
+            batch_size=args.batch_size,
+            num_workers=args.N_WORKERS,
+        )
+        for env in trdatalist
+    ]
+
+    eval_loaders = [
+        DataLoader(
+            dataset=env,
+            batch_size=64,
+            num_workers=args.N_WORKERS,
+            drop_last=False,
+            shuffle=False,
+        )
+        for env in valdatalist + tedatalist
+    ]
+
+    return train_loaders, eval_loaders
+
 
 
 def get_img_dataloader(args):
@@ -29,124 +130,10 @@ def get_img_dataloader(args):
 
         all_target_classes = [0, 1, 2, 3, 4, 5, 6]
     if args.dataset == 'office-home':
-        if args.is_different_class_space == 1:
-            source_classes[0] = [
-                21,
-                22,
-                23,
-                24,
-                25,
-                26,
-                27,
-                28,
-                29,
-                30,
-                31,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                0,
-                1,
-                2,
-            ]
-            source_classes[1] = [
-                32,
-                33,
-                34,
-                35,
-                36,
-                37,
-                38,
-                39,
-                40,
-                41,
-                42,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                15,
-                16,
-                17,
-                18,
-                19,
-                20,
-                0,
-                1,
-                2,
-            ]
-            source_classes[2] = [
-                43,
-                44,
-                45,
-                46,
-                47,
-                48,
-                49,
-                50,
-                51,
-                52,
-                53,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                16,
-                17,
-                18,
-                19,
-                20,
-                0,
-                1,
-                2,
-            ]
-        else:
-            for i in range(3):
-                source_classes[i] = list(range(54))
-
-        all_target_classes = [
-            0,
-            3,
-            4,
-            9,
-            10,
-            15,
-            16,
-            21,
-            22,
-            23,
-            32,
-            33,
-            34,
-            43,
-            44,
-            45,
-            54,
-            55,
-            56,
-            57,
-            58,
-            59,
-            60,
-            61,
-            62,
-            63,
-            64,
-        ]
+        source_classes[0] = list(range(0, 15)) + list(range(21, 32))
+        source_classes[1] = list(range(0, 9)) + list(range(15, 21)) + list(range(32, 43))
+        source_classes[2] = list(range(0, 3)) + list(range(9, 21)) + list(range(43, 54))
+        all_target_classes = [0,3,4,9,10,15,16,21,22,23,32,33,34,43,44,45] + list(range(54, 65))
 
     needed_classes[args.test_envs[0]] = all_target_classes
     indices = list(range(4))

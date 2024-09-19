@@ -12,8 +12,9 @@ class OfficeHome(ImageList):
                'Fan', 'Ruler', 'Pan', 'Screwdriver', 'Trash_Can', 'Printer', 'Speaker', 'Eraser', 'Bucket', 'Chair',
                'Calendar', 'Calculator', 'Flowers', 'Lamp_Shade', 'Spoon', 'Candles', 'Clipboards', 'Scissors', 'TV',
                'Curtains', 'Fork', 'Soda', 'Table', 'Knives', 'Oven', 'Refrigerator', 'Marker']
+    CLASSES.sort()
 
-    def __init__(self, root, task, filter_class, split='all', **kwargs):
+    def __init__(self, root, task, filter_class,shots, split='all', **kwargs):
         if split == 'all':
             self.image_list = {
                 "A": "image_list/Art.txt",
@@ -23,17 +24,17 @@ class OfficeHome(ImageList):
             }
         elif split == 'train':
             self.image_list = {
-                "A": "image_list/Art_train.txt",
-                "C": "image_list/Clipart_train.txt",
-                "P": "image_list/Product_train.txt",
-                "R": "image_list/Real_World_train.txt",
+                "A": f"image_list/art_train_{shots}.txt",
+                "C": f"image_list/clipart_train_{shots}.txt",
+                "P": f"image_list/product_train_{shots}.txt",
+                "R": f"image_list/realworld_train_{shots}.txt",
             }
         elif split == 'val':
             self.image_list = {
-                "A": "image_list/Art_val.txt",
-                "C": "image_list/Clipart_val.txt",
-                "P": "image_list/Product_val.txt",
-                "R": "image_list/Real_World_val.txt",
+                "A": f"image_list/art_val.txt",
+                "C": f"image_list/clipart_val.txt",
+                "P": f"image_list/product_val.txt",
+                "R": f"image_list/realworld_val.txt",
             }
 
         assert task in self.image_list
@@ -42,7 +43,7 @@ class OfficeHome(ImageList):
         super(OfficeHome, self).__init__(root, num_classes=len(filter_class), data_list_file=data_list_file,
                                        filter_class=filter_class, **kwargs)
 
-        self.domain = ["Art", "Clipart", "Product", "Real_World"]
+        self.domain = ["art", "clipart", "product", "realwdorld"]
 
     def __getitem__(self, index):
         """
@@ -51,7 +52,7 @@ class OfficeHome(ImageList):
             - **return** (tuple): (image, target) where target is index of the target class.
         """
         path, target = self.data_list[index]
-        domain_name = path.split('/')[8]
+        domain_name = path.split('/')[-4]
         domain_label = self.domain.index(domain_name)
         img = self.loader(path)
         if self.transform is not None:

@@ -20,7 +20,7 @@ from utils.daml_util import (
 
 import sys
 sys.path.append('..')
-import CLIP.clip as clip
+from clip import clip
 import timm
 
 

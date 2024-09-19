@@ -20,7 +20,7 @@ from utils.daml_util import (
 
 import sys
 sys.path.append('..')
-import CLIP.clip as clip
+from clip import clip
 import timm
 
 
@@ -113,7 +113,9 @@ class SCIPD(Algorithm):
     def update(self, minibatches, opt, sch):
 
         # data preparation
+        # print(minibatches)
         all_x = torch.cat([data[0].to(self.device).float() for data in minibatches])
+        # print("set zerograd")
         all_y = torch.cat([data[1].to(self.device).long() for data in minibatches])
         all_domain = torch.cat([data[2].to(self.device).long() for data in minibatches])
         thresh = self.args.test_envs[0]
@@ -124,6 +126,7 @@ class SCIPD(Algorithm):
 
         net_opt.zero_grad()
         cls_opt.zero_grad()
+        
 
         # CLIP initialization
 
@@ -176,6 +179,7 @@ class SCIPD(Algorithm):
                'Mop', 'Sneakers', 'Notebook', 'Backpack', 'Alarm_Clock', 'Push_Pin', 'Paper_Clip', 'Batteries', 'Radio',
                'Fan', 'Ruler', 'Pan', 'Screwdriver', 'Trash_Can', 'Printer', 'Speaker', 'Eraser', 'Bucket', 'Chair',
                'Calendar', 'Calculator', 'Flowers', 'Lamp_Shade', 'Spoon', 'Candles']
+        known_classnames.sort()
         # image_input = self.preprocess(minibatches).unsqueeze(0).to(self.device)
         text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in known_classnames]).to(self.device)
 

@@ -28,6 +28,7 @@ from utils.util import (
 from datautil.getdataloader import (
     get_img_dataloader,
     get_img_daml_dataloader,
+    get_odgclip_dataloader,
     get_img_source_unknown_dataloader,
     get_img_daml_source_unknown_dataloader,
     get_img_daml_multi_dataloader,
@@ -56,9 +57,10 @@ def get_args():
     parser.add_argument(
         "--classifier", type=str, default="linear", choices=["linear", "wn"]
     )
-    parser.add_argument("--data_file", type=str, default="", help="root_dir")
-    parser.add_argument("--dataset", type=str, default="office")
-    parser.add_argument("--data_dir", type=str, default="", help="data dir")
+    # parser.add_argument("--dataset", type=str, default="office-home")
+    # parser.add_argument("--data_dir", type=str, default="/raid/biplab/hassan/office_home_dg", help="root dir")
+    parser.add_argument("--dataset", type=str, default="PACS")
+    parser.add_argument("--data_dir", type=str, default="/raid/biplab/hassan/pacs_data", help="root dir")
     parser.add_argument(
         "--dis_hidden", type=int, default=256, help="dis hidden dimension"
     )
@@ -109,7 +111,7 @@ def get_args():
         default="resnet50",
         help="featurizer: vgg16, resnet50, resnet101,DTNBase",
     )
-    parser.add_argument("--N_WORKERS", type=int, default=4)
+    parser.add_argument("--N_WORKERS", type=int, default=0)
     parser.add_argument(
         "--rsc_f_drop_factor", type=float, default=1 / 3, help="rsc hyper-param"
     )
@@ -167,7 +169,7 @@ def get_args():
     parser.add_argument("--meta_step_size", type=float, default=0.01)
 
     parser.add_argument(
-        "--test_envs", type=int, nargs="+", default=[0], help="target domains"
+        "--test_envs", type=int, nargs="+", default=[1], help="target domains"
     )
     parser.add_argument(
         "--output", type=str, default="train_output", help="result output path"
@@ -181,12 +183,13 @@ def get_args():
     parser.add_argument("--d_path", type=str, default="nothing")
     parser.add_argument("--t_domain", type=str, default="C")
     # CLIP hyper1,2,3
+    parser.add_argument("--shot", type=float, default=1, help="shots")
     parser.add_argument("--hyper1", type=float, default=0.8)
     parser.add_argument("--hyper2", type=float, default=0.5)
     parser.add_argument("--hyper3", type=float, default=0.1)
     args = parser.parse_args()
 
-    args.data_dir = args.data_file + args.data_dir
+    # args.data_dir = args.data_file + args.data_dir
     os.environ["CUDA_VISIBLE_DEVICS"] = args.gpu_id
     if args.dataset != 'MultiDataSet':
         os.makedirs(args.output + "/eval", exist_ok=True)
@@ -212,19 +215,21 @@ if __name__ == "__main__":
 
     loss_list = alg_loss_dict(args)
 
-    if args.loader_name == 'DeepDG_loader':
-        train_loaders, eval_loaders = get_img_dataloader(args)
-        source_unknown_loaders = get_img_source_unknown_dataloader(args)
+    train_loaders,eval_loaders = get_odgclip_dataloader(args)
 
-    elif args.loader_name == 'daml_loader':
-        if args.d_path == 'nothing':
-            train_loaders, eval_loaders = get_img_daml_dataloader(args)
-            source_unknown_loaders = get_img_daml_source_unknown_dataloader(args)
-        elif args.dataset == 'MultiDataSet':
-            train_loaders, eval_loaders = get_img_daml_multi_dataloader(args)
-            source_unknown_loaders = (
-                eval_loaders  # get_img_daml_multi_source_unknown_dataloader(args)
-            )
+    # if args.loader_name == 'DeepDG_loader':
+    #     train_loaders, eval_loaders = get_img_dataloader(args)
+    #     source_unknown_loaders = get_img_source_unknown_dataloader(args)
+
+    # elif args.loader_name == 'daml_loader':
+    #     if args.d_path == 'nothing':
+    #         train_loaders, eval_loaders = get_img_daml_dataloader(args)
+    #         source_unknown_loaders = get_img_daml_source_unknown_dataloader(args)
+    #     elif args.dataset == 'MultiDataSet':
+    #         train_loaders, eval_loaders = get_img_daml_multi_dataloader(args)
+    #         source_unknown_loaders = (
+    #             eval_loaders  # get_img_daml_multi_source_unknown_dataloader(args)
+    #         )
 
     # eval_name_dict = {"train": [], "valid": [], "target": []}
     if args.dataset == 'MultiDataSet':
@@ -294,6 +299,8 @@ if __name__ == "__main__":
     s = ""
     ################################################
     h_scores = []
+    clsoed_accu = []
+    open_accu = []
 
     if args.dataset != 'MultiDataSet':
         filename = args.output + f"/eval/threshold_range_list"
@@ -326,8 +333,7 @@ if __name__ == "__main__":
                 )
             )
         else:
-            h_scores.append(
-                modelopera.h_score(
+            hscore,closedscore,openscore = modelopera.h_score(
                 # modelopera.h_score_ova(
                 # modelopera.h_score_froment(
                     algorithm,
@@ -338,9 +344,12 @@ if __name__ == "__main__":
                     args.gpu_id,
                     thd,
                 )
-            )
+            h_scores.append(hscore)
+            clsoed_accu.append(closedscore)
+            open_accu.append(openscore)
     print(h_scores)
-
+    index = np.argmax(np.array(h_scores))
+    print(f"max h score : {max(h_scores)} closed set : {clsoed_accu[index]} open set : {open_accu[index]}")
     s += 'target' + "_max-h-score:%.4f," % max(h_scores)
     s += 'target' + "_mean-h-score:%.4f," % (sum(h_scores) / len(h_scores))
     ################################################

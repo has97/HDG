@@ -1,0 +1,6 @@
+# Ignore all __pycache__ directories
+**/__pycache__/
+
+# Ignore train_output directory
+train_output/
+

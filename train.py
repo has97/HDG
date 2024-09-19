@@ -5,7 +5,7 @@ import sys
 import time
 import numpy as np
 import argparse
-
+from tqdm import tqdm
 from alg.opt import *
 from alg import alg, modelopera
 from utils.util import (
@@ -25,6 +25,7 @@ from datautil.getdataloader import (
     get_img_dataloader,
     get_img_daml_dataloader,
     get_img_daml_multi_dataloader,
+    get_odgclip_dataloader
 )
 
 
@@ -38,9 +39,10 @@ def get_args():
         default=500,
         help="Penalty anneal iters used in VREx",
     )
-    parser.add_argument("--batch_size", type=int, default=32, help="batch_size")
+    parser.add_argument("--batch_size", type=int, default=4, help="batch_size")
     parser.add_argument("--beta", type=float, default=1, help="DIFEX beta")
     parser.add_argument("--beta1", type=float, default=0.5, help="Adam hyper-param")
+    parser.add_argument("--shot", type=float, default=5, help="shots")
     parser.add_argument('--beta2', type=float, default=0.5)
     parser.add_argument("--bottleneck", type=int, default=256)
     parser.add_argument(
@@ -49,9 +51,9 @@ def get_args():
     parser.add_argument(
         "--classifier", type=str, default="linear", choices=["linear", "wn"]
     )
-    parser.add_argument("--data_file", type=str, default="", help="root_dir")
-    parser.add_argument("--dataset", type=str, default="office")
-    parser.add_argument("--data_dir", type=str, default="", help="data dir")
+    # parser.add_argument("--data_file", type=str, default="", help="root_dir")
+    parser.add_argument("--dataset", type=str, default="PACS")
+    parser.add_argument("--data_dir", type=str, default="/raid/biplab/hassan/pacs_data", help="root dir")
     parser.add_argument(
         "--dis_hidden", type=int, default=256, help="dis hidden dimension"
     )
@@ -108,7 +110,7 @@ def get_args():
         default="resnet50",
         help="featurizer: vgg16, resnet50, resnet101,DTNBase",
     )
-    parser.add_argument("--N_WORKERS", type=int, default=4)
+    parser.add_argument("--N_WORKERS", type=int, default=0)
     parser.add_argument(
         "--rsc_f_drop_factor", type=float, default=1 / 3, help="rsc hyper-param"
     )
@@ -154,7 +156,7 @@ def get_args():
     parser.add_argument("--meta_step_size", type=float, default=0.01)
 
     parser.add_argument(
-        "--test_envs", type=int, nargs="+", default=[0], help="target domains"
+        "--test_envs", type=int, nargs="+", default=[1], help="target domains"
     )
     parser.add_argument(
         "--output", type=str, default="train_output", help="result output path"
@@ -176,7 +178,7 @@ def get_args():
     parser.add_argument("--hyper3", type=float, default=0.1)
     args = parser.parse_args()
 
-    args.data_dir = args.data_file + args.data_dir
+    # args.data_dir = args.data_file + args.data_dir
     os.environ["CUDA_VISIBLE_DEVICS"] = args.gpu_id
     os.makedirs(args.output, exist_ok=True)
     sys.stdout = Tee(os.path.join(args.output, "out.txt"))
@@ -203,13 +205,16 @@ if __name__ == "__main__":
     set_random_seed(args.seed)
 
     loss_list = alg_loss_dict(args)
-    if args.loader_name == 'DeepDG_loader':
-        train_loaders, eval_loaders = get_img_dataloader(args)
-    elif args.loader_name == 'daml_loader':
-        if args.dataset == 'MultiDataSet':
-            train_loaders, eval_loaders = get_img_daml_multi_dataloader(args)
-        else:
-            train_loaders, eval_loaders = get_img_daml_dataloader(args)
+
+    train_loaders,eval_loaders = get_odgclip_dataloader(args)
+    print(len(eval_loaders[0]))
+    # if args.loader_name == 'DeepDG_loader':
+    #     train_loaders, eval_loaders = get_img_dataloader(args)
+    # elif args.loader_name == 'daml_loader':
+    #     if args.dataset == 'MultiDataSet':
+    #         train_loaders, eval_loaders = get_img_daml_multi_dataloader(args)
+    #     else:
+    #         train_loaders, eval_loaders = get_img_daml_dataloader(args)
 
     # eval_name_dict = {"train": [], "valid": [], "target": []}
     if args.dataset == 'MultiDataSet':
@@ -218,12 +223,16 @@ if __name__ == "__main__":
         eval_name_dict = {"train": [0, 1, 2], "valid": [3, 4, 5], "target": [6]}
     else:
         eval_name_dict = train_valid_target_eval_names(args)
+    # print("Reached here")
     known_classes_set, unknown_classes_set = get_k_u_classes_set(
         args, eval_name_dict, train_loaders, eval_loaders
     )
+    print(known_classes_set)
     # AD-HOC because 'args.num_classes' has previously been defined inside the img_params_init function
     args.num_classes = len(known_classes_set)
     algorithm_class = alg.get_algorithm_class(args.algorithm)
+
+    
     algorithm = algorithm_class(args).to(f'cuda:{args.gpu_id}')
     algorithm.train()
     opt = get_optimizer(algorithm, args)
@@ -258,9 +267,14 @@ if __name__ == "__main__":
     early_stopping_cnt = 0
     print("===========start training===========")
     sss = time.time()
+    # for i, loader in enumerate(train_loaders):
+    #     print(f"Loader {i} contains {len(loader)} elements.")
     for epoch in range(args.max_epoch):
-        for iter_num in range(args.steps_per_epoch):
+        for iter_num in tqdm(range(args.steps_per_epoch)):
+            # print(iter_num)
+            # print(train_minibatches_iterator)
             minibatches_device = [(data) for data in next(train_minibatches_iterator)]
+            # print("Stuck")
             if args.algorithm == "VREx" and algorithm.update_count == args.anneal_iters:
                 opt = get_optimizer(algorithm, args)
                 sch = get_scheduler(opt, args)
@@ -272,7 +286,7 @@ if __name__ == "__main__":
             else:
                 step_vals: dict = algorithm.update(minibatches_device, opt, sch)
 
-        # print("the training time of an epoch: %.4f" % (time.time() - sss))
+        print("the training time of an epoch: %.4f" % (time.time() - sss))
         # assert 1==2
         if (epoch in [int(args.max_epoch * 0.7), int(args.max_epoch * 0.9)]) and (
             not args.schuse
@@ -333,7 +347,16 @@ if __name__ == "__main__":
                 args.gpu_id,
             )
 
-            s += 'target' + "_auroc:%.4f," % target_auroc
+            # target_acc = modelopera.accuracy(
+            #                     algorithm,
+            #                     eval_loaders[eval_name_dict['target'][0]],
+            #                     item,
+            #                     known_classes_set,
+            #                     unknown_classes_set,
+            #                     args.gpu_id,
+            #                 )
+
+            s += 'target' + "_aucroc:%.4f," % target_acc
 
             print(s[:-1])
             if acc_record["valid"] >= best_valid_acc:
